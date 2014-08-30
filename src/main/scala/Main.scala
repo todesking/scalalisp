@@ -17,6 +17,10 @@ object Main {
     env.eval(l('if, 1, 2, 3)) === Num(2)
     env.eval(l('if, SNil, 2, 3)) === Num(3)
     env.eval(l(Sym("set!"), 'x, 1)) >> 'x.toS === Num(1)
+    env.eval(l(
+      l('lambda, l('x),
+        l('+, 'x, 1)),
+      100)) === Num(101)
   }
 }
 
@@ -41,14 +45,30 @@ class Env(values:Map[String, S]) {
     case (Sym("set!"), Seq(Sym(name), valueS)) =>
       val (value, e) = eval(valueS)
       Some((SNil, e.update(name, value)))
+    case (Sym("lambda"), Seq(ProperList(args @ _*), body:S)) =>
+      Some(
+        Lambda(args.map{case Sym(name) => name case _ => throw new E("argument should symbol")}, body),
+        this
+      )
     case _ => None
   }
-  def evalApply(func:S, args:Seq[S]):(S, Env) = eval(func) match {
-    case (NativeProc(body), e) => (body(args), e)
-    case unk => throw new RuntimeException(s"cant apply to ${unk}")
+  def evalApply(func:S, args:Seq[S]):(S, Env) = {
+    val (evaledArgs, env) = evalSeq(args)
+    env.eval(func) match {
+      case (NativeProc(body), e) => (body(evaledArgs), e)
+      case (Lambda(params, body), e) =>
+        extend(params, evaledArgs).eval(body)
+      case unk => throw new RuntimeException(s"cant apply to ${unk}")
+    }
   }
 
+  def evalSeq(exprs:Seq[S]):(Seq[S], Env) = exprs.foldLeft((Seq[S](), this)) { (re, expr) => val (results, env) = re; val (result, newe) = env.eval(expr); (result +: results, newe) }
+
   def update(name:String, value:S):Env = new Env(values + (name -> value))
+
+  def extend(params:Seq[String], args:Seq[S]) = new Env(
+    params.zip(args).foldLeft(values) { (values, pa) => val (param, arg) = pa; values + (param -> arg) }
+  )
 }
 
 object Env {
@@ -84,6 +104,7 @@ case object SNil                       extends S {
 case class Num(value:Int)               extends S
 case class Sym(value:String)            extends S
 case class NativeProc(body:Seq[S] => S) extends S
+case class Lambda(args:Seq[String], body:S) extends S
 
 object ProperList {
   def unapplySeq(value:S):Option[Seq[S]] = value match {
