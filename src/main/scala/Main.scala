@@ -1,14 +1,17 @@
 package com.todesking.scalalisp
 
 object Main {
+  implicit class ToS(value:Any) {
+    def toS:S = U.parse(value)
+  }
   def main(args:Array[String]):Unit = {
     val env = Env.newGlobal()
 
     assert(env.eval(Num(1))._1 == Num(1))
-    assert(env.eval(U.list(Sym("+"), Num(1), Num(2)))._1 == Num(3))
-    assert(env.eval(U.list(Sym("if"), Num(1), Num(2), Num(3)))._1 == Num(2))
-    assert(env.eval(U.list(Sym("if"), SNil, Num(2), Num(3)))._1 == Num(3))
-    assert(env.eval(U.list(Sym("set!"), Sym("x"), Num(1)))._2.eval(Sym("x"))._1 == Num(1))
+    assert(env.eval(Seq('+, 1, 2).toS)._1 == Num(3))
+    assert(env.eval(Seq('if, 1, 2, 3).toS)._1 == Num(2))
+    assert(env.eval(Seq('if, SNil, 2, 3).toS)._1 == Num(3))
+    assert(env.eval(Seq(Sym("set!"), 'x, 1).toS)._2.eval('x.toS)._1 == Num(1))
   }
 }
 
@@ -55,6 +58,13 @@ class E(val message:String) extends RuntimeException(message)
 
 object U {
   def list(values:S*):S = values.foldRight[S](SNil) { (x, a) => Cons(x, a) }
+  def parse(value:Any):S = value match {
+    case s:S              => s
+    case Seq(values @ _*) => list(values.map(U.parse):_*)
+    case s:Symbol         => Sym(s.name)
+    case i:Int            => Num(i)
+    case _                => throw new E("Parse error")
+  }
 }
 
 abstract sealed class S {
