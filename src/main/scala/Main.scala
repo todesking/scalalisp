@@ -4,14 +4,18 @@ object Main {
   implicit class ToS(value:Any) {
     def toS:S = U.parse(value)
   }
+  implicit class SProcess(ve:(S, Env)) {
+    def >>(expr:S):(S, Env) = ve._2.eval(expr)
+    def ===(expected:S):Unit = assert(ve._1 == expected)
+  }
   def main(args:Array[String]):Unit = {
     val env = Env.newGlobal()
 
-    assert(env.eval(Num(1))._1 == Num(1))
-    assert(env.eval(Seq('+, 1, 2).toS)._1 == Num(3))
-    assert(env.eval(Seq('if, 1, 2, 3).toS)._1 == Num(2))
-    assert(env.eval(Seq('if, SNil, 2, 3).toS)._1 == Num(3))
-    assert(env.eval(Seq(Sym("set!"), 'x, 1).toS)._2.eval('x.toS)._1 == Num(1))
+    env.eval(Num(1)) === Num(1)
+    env.eval(Seq('+, 1, 2).toS) === Num(3)
+    env.eval(Seq('if, 1, 2, 3).toS) === Num(2)
+    env.eval(Seq('if, SNil, 2, 3).toS) === Num(3)
+    env.eval(Seq(Sym("set!"), 'x, 1).toS) >> 'x.toS === Num(1)
   }
 }
 
