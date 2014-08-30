@@ -51,6 +51,7 @@ object Main {
 
 class Env(values:Map[String, S]) {
   def this(values:(String, S)*) = this(Map(values:_*))
+  override def toString = values.toString
   def eval(expr:S):(S, Env) = {
     println(s"EVAL ${expr}, ENV=${this}")
     expr match {
