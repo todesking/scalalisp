@@ -8,14 +8,15 @@ object Main {
     def >>(expr:S):(S, Env) = ve._2.eval(expr)
     def ===(expected:S):Unit = assert(ve._1 == expected)
   }
+  def l(values:Any*) = U.parse(values)
   def main(args:Array[String]):Unit = {
     val env = Env.newGlobal()
 
     env.eval(Num(1)) === Num(1)
-    env.eval(Seq('+, 1, 2).toS) === Num(3)
-    env.eval(Seq('if, 1, 2, 3).toS) === Num(2)
-    env.eval(Seq('if, SNil, 2, 3).toS) === Num(3)
-    env.eval(Seq(Sym("set!"), 'x, 1).toS) >> 'x.toS === Num(1)
+    env.eval(l('+, 1, 2)) === Num(3)
+    env.eval(l('if, 1, 2, 3)) === Num(2)
+    env.eval(l('if, SNil, 2, 3)) === Num(3)
+    env.eval(l(Sym("set!"), 'x, 1)) >> 'x.toS === Num(1)
   }
 }
 
