@@ -1,12 +1,5 @@
 package com.todesking.scalalisp
 
-object Tapper {
-  implicit class Tap[A](obj:A) {
-    def tap(f:A=>Unit):A = { f(obj); obj }
-  }
-}
-import Tapper._
-
 object Main {
   implicit class ToS(value:Any) {
     def toS:S = U.parse(value)
@@ -17,22 +10,24 @@ object Main {
   }
   def l(values:Any*) = U.parse(values)
   def main(args:Array[String]):Unit = {
+    val set_! = Sym("set!")
+
     val env = Env.newGlobal()
 
     env.eval(Num(1)) === Num(1)
     env.eval(l('+, 1, 2)) === Num(3)
     env.eval(l('if, 1, 2, 3)) === Num(2)
     env.eval(l('if, SNil, 2, 3)) === Num(3)
-    env.eval(l(Sym("set!"), 'x, 1)) >> 'x.toS === Num(1)
+    env.eval(l(set_!, 'x, 1)) >> 'x.toS === Num(1)
     env.eval(l(
       l('lambda, l('x),
         l('+, 'x, 1)),
       100)) === Num(101)
 
-    env.eval(l(Sym("set!"), 'plus,
+    env.eval(l(set_!, 'plus,
         l('lambda, l('x, 'y),
           l('+, 'x, 'y)) )) >>
-      l(Sym("set!"), 'foo, 100) >>
+      l(set_!, 'foo, 100) >>
       l('plus, 'foo, 10) === Num(110)
 
     env.eval(l(
@@ -42,11 +37,11 @@ object Main {
       10, 20)) === Num(31)
 
     env.eval(
-      l(Sym("set!"), 'incr,
+      l(set_!, 'incr,
         l(
           l('lambda, l('counter),
             l('lambda, l(), l('begin,
-              l(Sym("set!"), 'counter, l('+, 'counter, 1)),
+              l(set_!, 'counter, l('+, 'counter, 1)),
               'counter))),
           0))) >>
       l('incr) >>
