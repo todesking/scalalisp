@@ -128,19 +128,19 @@ abstract sealed class S {
   def isTruthy:Boolean = true
 }
 
-case class Cons(car:S, cdr:S)           extends S
-case object SNil                       extends S {
+case class Cons(car:S, cdr:S)                            extends S
+case object SNil                                         extends S {
   override def isTruthy = false
 }
-case class Num(value:Int)               extends S
-case class Sym(value:String)            extends S
-case class NativeProc(body:Seq[S] => S) extends S
+case class Num(value:Int)                                extends S
+case class Sym(value:String)                             extends S
+case class NativeProc(body:Seq[S] => S)                  extends S
 case class Lambda(var env:Env, args:Seq[String], body:S) extends S
 
 object ProperList {
   def unapplySeq(value:S):Option[Seq[S]] = value match {
     case Cons(a, b) => for { tail <- unapplySeq(b) } yield { a +: tail }
-    case SNil => Some(Seq())
-    case _ => None
+    case SNil       => Some(Seq())
+    case _          => None
   }
 }
