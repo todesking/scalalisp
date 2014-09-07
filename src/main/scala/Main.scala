@@ -24,16 +24,17 @@ object Main {
     eval(l('+, 1, 2))             === S(3)
     eval(l('if, 1, 2, 3))         === S(2)
     eval(l('if, SNil, 2, 3))      === S(3)
-    eval(l(set_!, 'x, 1), S('x)) === S(1)
+    eval(l('define, 'x, 1), S('x)) === S(1)
+    eval(l('define, 'x, 1), l(set_!, 'x, S(2)), S('x)) === S(2)
     eval(l(
       l('lambda, l('x),
         l('+, 'x, 1)),
       100)) === S(101)
 
-    eval(l(set_!, 'plus,
+    eval(l('define, 'plus,
         l('lambda, l('x, 'y),
           l('+, 'x, 'y)) ),
-      l(set_!, 'foo, 100),
+      l('define, 'foo, 100),
       l('plus, 'foo, 10)) === S(110)
 
     eval(l(
@@ -43,7 +44,7 @@ object Main {
       10, 20)) === S(31)
 
     eval(
-      l(set_!, 'incr,
+      l('define, 'incr,
         l(
           l('lambda, l('counter),
             l('lambda, l(), l('begin,
@@ -52,13 +53,37 @@ object Main {
           0)),
       l('incr),
       l('incr)) === S(2)
+    eval(
+      l('define, 'x, 1),
+      l(
+        l('lambda, l('x), l(set_!, 'x, 10)),
+        1),
+      S('x)
+    ) === S(1)
   }
 }
 
-class Env(var values:Map[String, S]) {
+abstract class Env(_values:Map[String, S]) {
+  var values:Map[String, S] = _values
 
-  def lookup(key:String):S =
-    values.getOrElse(key, throw new E(s"Symbol not found: ${key}"))
+  def isDefined0(key:String):Boolean = values.contains(key)
+  def isDefined(key:String):Boolean
+
+  def lookup0(key:String):Option[S] = values.get(key)
+  def lookup(key:String):S
+
+  def set(key:String, value:S):Unit
+
+  def define(key:String, value:S):Unit = values = values + (key -> value)
+
+  def defineAll(names:Seq[String], values:Seq[S]):Unit =
+    names.zip(values).foreach{case (k, v) => define(k, v)}
+
+  def extend(names:Seq[String], values:Seq[S]) = new Env.Child(this,
+    names.zip(values).foldLeft(Map.empty[String, S]) { (vs, nv) => val (n, v) = nv; vs + (n -> v) }
+  )
+
+  protected def variableNotFoundError(key:String) = throw new E(s"Variable not found: ${key}")
 
   override def toString = values.toString
 
@@ -80,7 +105,10 @@ class Env(var values:Map[String, S]) {
       val body = if(cond.isTruthy) thenS else elseS
       eval(body).toSome
     case (Sym("set!"), Seq(Sym(name), valueS)) =>
-      update(name, eval(valueS))
+      set(name, eval(valueS))
+      Some(SNil)
+    case (Sym("define"), Seq(Sym(name), valueS)) =>
+      define(name, eval(valueS))
       Some(SNil)
     case (Sym("lambda"), Seq(ProperList(args @ _*), body:S)) =>
       Lambda(this, args.map{case Sym(name) => name case _ => throw new E("argument should symbol")}, body).toSome
@@ -94,25 +122,34 @@ class Env(var values:Map[String, S]) {
     eval(func) match {
       case NativeProc(body) => body(evaledArgs)
       case Lambda(closed, params, body) =>
-        closed.updateAll(params, evaledArgs)
-        closed.eval(body)
+        closed.extend(params, evaledArgs).eval(body)
       case unk => throw new RuntimeException(s"cant apply to ${unk}")
     }
   }
-
-  def update(name:String, value:S):Unit =
-    this.values = values + (name -> value)
-  def updateAll(names:Seq[String], values:Seq[S]):Unit =
-    names.zip(values).foreach{case (k, v) => update(k, v)}
-
-  def extend(names:Seq[String], values:Seq[S]) = new Env(
-    names.zip(values).foldLeft(this.values) { (vs, nv) => val (n, v) = nv; vs + (n -> v) }
-  )
 }
 
+
 object Env {
+  class Root(_values:Map[String, S]) extends Env(_values) {
+    override def isDefined(key:String):Boolean = isDefined0(key)
+    override def lookup(key:String):S = lookup0(key).getOrElse(variableNotFoundError(key))
+    override def set(key:String, value:S):Unit =
+      if(isDefined0(key)) define(key, value)
+      else variableNotFoundError(key)
+  }
+
+  class Child(parent:Env, _values:Map[String, S]) extends Env(_values) {
+    override def isDefined(key:String):Boolean = isDefined0(key) || parent.isDefined(key)
+    override def lookup(key:String) = lookup0(key) getOrElse parent.lookup(key)
+    override def set(key:String, value:S):Unit =
+      if(isDefined0(key)) define(key, value)
+      else parent.set(key, value)
+  }
+
+  def root(values:Map[String, S]) = new Root(values)
+
   def newGlobal():Env = {
-    new Env(Map(
+    root(Map(
       "+" -> NativeProc { case Seq(a, b) => Num(a.as[Num].value + b.as[Num].value) }
     ))
   }
